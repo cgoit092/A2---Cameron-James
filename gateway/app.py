@@ -19,6 +19,8 @@ STATUS = {
     grpc.StatusCode.UNAVAILABLE: 503,
 }
 
+MAX_INT32 = 2**31 - 1  # largest value an int32 protobuf field can hold
+
 app = Flask(__name__)
 events = event_pb2_grpc.EventServiceStub(grpc.insecure_channel(CONFIG["event_service"]))
 registrations = registration_pb2_grpc.RegistrationServiceStub(
@@ -27,6 +29,12 @@ registrations = registration_pb2_grpc.RegistrationServiceStub(
 
 def fields(message):
     return {field.name: getattr(message, field.name) for field in message.DESCRIPTOR.fields}
+
+def json_body():
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        abort(400, "Request body must be a JSON object")
+    return body
 
 
 @app.errorhandler(grpc.RpcError)
@@ -52,7 +60,14 @@ def get_event(event_id):
 
 @app.post("/api/v1/events")
 def add_event():
-    abort(501, "TODO task 2: implement POST /api/v1/events")
+    body = json_body()
+    name, capacity = body.get("name"), body.get("capacity")
+    if not isinstance(name, str):
+        abort(400, "name is required and must be a string")
+    if type(capacity) is not int or not 0 <= capacity <= MAX_INT32:
+        abort(400, "capacity is required and must be a whole number from 0 to 2147483647")
+    event = events.CreateEvent(event_pb2.CreateEventRequest(name=name, capacity=capacity))
+    return jsonify(fields(event)), 201
 
 
 @app.patch("/api/v1/events/<int:event_id>")
