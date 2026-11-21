@@ -1,7 +1,7 @@
 import json
 
 import grpc
-from flask import Flask, abort, jsonify
+from flask import Flask, abort, jsonify, request
 from werkzeug.exceptions import HTTPException
 import event_pb2
 import event_pb2_grpc
@@ -41,7 +41,8 @@ def http_error(error):
 
 @app.get("/api/v1/events")
 def list_events():
-    abort(501, "TODO task 1: implement GET /api/v1/events")
+    reply = events.ListEvents(event_pb2.ListEventsRequest(name=request.args.get("name", "")))
+    return jsonify([fields(event) for event in reply.events])
 
 
 @app.get("/api/v1/events/<int:event_id>")
