@@ -72,7 +72,18 @@ def add_event():
 
 @app.patch("/api/v1/events/<int:event_id>")
 def edit_event(event_id):
-    abort(501, "TODO task 2: implement PATCH /api/v1/events/<event_id>")
+    body = json_body()
+    unknown = set(body) - {"name", "capacity"}
+    if unknown:
+         abort(400, f"Unknown field(s): {', '.join(sorted(unknown))}")
+    if not body:
+         abort(400, "Send name and/or capacity")
+    if "name" in body and not isinstance(body["name"], str):
+         abort(400, "name must be a string")
+    if "capacity" in body and (type(body["capacity"]) is not int or not 0 <= body["capacity"] <= MAX_INT32):
+         abort(400, "capacity must be a whole number from 0 to 2147483647")
+    event = events.UpdateEvent(event_pb2.UpdateEventRequest(event_id=event_id, **body))
+    return jsonify(fields(event))
 
 
 @app.delete("/api/v1/events/<int:event_id>")
