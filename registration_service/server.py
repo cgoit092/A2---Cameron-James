@@ -50,6 +50,28 @@ class RegistrationService(rpc.RegistrationServiceServicer):
             call(self.events.ReleaseSeat, event_pb2.EventId(event_id=found[0]["event_id"]), context)
         return pb.Empty()
 
+    def ListConfirmedBookings(self, request, context):
+        rows = read(
+            """
+            SELECT
+                b.booking_id,
+                b.event_id,
+                b.participant_id,
+                p.name AS participant_name
+            FROM bookings AS b
+            JOIN participants AS p
+                ON b.participant_id = p.participant_id
+            WHERE b.event_id = %s
+                AND b.state = 'confirmed'
+            ORDER BY b.booking_id
+            """,
+            (request.event_id,)
+        )
+
+        return pb.ConfirmedBookingList(
+            bookings=[pb.ConfirmedBooking(**row) for row in rows]
+        )
+
     def GetParticipant(self, request, context):
         rows = read(
             "SELECT participant_id, name FROM participants WHERE participant_id = %s",
