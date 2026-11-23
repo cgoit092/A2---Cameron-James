@@ -76,7 +76,10 @@ def get_participant(participant_id):
 
 @app.get("/api/v1/events/<int:event_id>/registrations")
 def list_bookings(event_id):
-    abort(501, "TODO task 4: implement GET /api/v1/events/<event_id>/registrations")
+    reply = registrations.ListConfirmedBookings(
+        registration_pb2.EventRegistrationsRequest(event_id=event_id)
+    )
+    return jsonify([fields(booking) for booking in reply.bookings])
 
 
 @app.post("/api/v1/registrations")
