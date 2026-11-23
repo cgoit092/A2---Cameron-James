@@ -94,12 +94,29 @@ def delete_event(event_id):
 
 @app.post("/api/v1/participants")
 def add_participant():
-    abort(501, "TODO task 3: implement POST /api/v1/participants")
+    body = request.get_json(silent=True)
+
+    if not isinstance(body, dict):
+        abort(400, "Request body must be a JSON object")
+
+    name = body.get("name")
+    if not isinstance(name, str):
+        abort(400, "name is required and must be a string")
+
+    participant = registrations.CreateParticipant(
+        registration_pb2.CreateParticipantRequest(name=name)
+    )
+
+    return jsonify(fields(participant)), 201
 
 
 @app.get("/api/v1/participants/<int:participant_id>")
 def get_participant(participant_id):
-    abort(501, "TODO task 3: implement GET /api/v1/participants/<participant_id>")
+    participant = registrations.GetParticipant(
+        registration_pb2.ParticipantId(participant_id=participant_id)
+    )
+
+    return jsonify(fields(participant))
 
 
 @app.get("/api/v1/events/<int:event_id>/registrations")
