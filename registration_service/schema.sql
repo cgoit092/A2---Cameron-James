@@ -14,6 +14,10 @@ CREATE TABLE bookings (
   event_id BIGINT NOT NULL,
   participant_id BIGINT NOT NULL,
   state VARCHAR(16) NOT NULL DEFAULT 'confirmed',
+  active_participant_id BIGINT GENERATED ALWAYS AS (
+    CASE WHEN state = 'confirmed' THEN participant_id ELSE NULL END
+  ) STORED,
+  UNIQUE KEY unique_confirmed_booking (event_id, active_participant_id),
   FOREIGN KEY (participant_id) REFERENCES participants (participant_id)
 );
 

@@ -73,6 +73,70 @@ class RegistrationService(rpc.RegistrationServiceServicer):
 
         return self.GetParticipant(pb.ParticipantId(participant_id=new_id), context)
 
+    def CreateBooking(self, request, context):
+        event_id = request.event_id
+        participant_id = request.participant_id
+
+        if event_id <= 0 or participant_id <= 0:
+            context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT,
+                "Event ID and participant ID must be positive"
+            )
+
+        participant = self.GetParticipant(
+            pb.ParticipantId(participant_id=participant_id), context
+        )
+
+        event = event_pb2.EventId(event_id=event_id)
+        call(self.events.GetEvent, event, context)
+
+        existing = read(
+            """SELECT booking_id FROM bookings
+               WHERE event_id = %s AND participant_id = %s
+               AND state = 'confirmed'""",
+            (event_id, participant_id)
+        )
+
+        if existing:
+            context.abort(
+                grpc.StatusCode.ALREADY_EXISTS,
+                "Participant already booked for this event"
+            )
+
+        call(self.events.ReserveSeat, event, context)
+
+        try:
+            booking_id = write(
+                """INSERT INTO bookings (event_id, participant_id)
+                   VALUES (%s, %s)""",
+                (event_id, participant_id)
+            )
+        
+        except mysql.connector.Error as error:
+            try:
+                self.events.ReleaseSeat(event)
+            except grpc.RpcError:
+                print("Warning: Failed to release seat after booking error")
+
+            if error.errno == 1062:
+                context.abort(
+                    grpc.StatusCode.ALREADY_EXISTS,
+                    "Participant already booked for this event"
+                )
+
+            context.abort(
+                grpc.StatusCode.INTERNAL,
+                "Failed to save booking"
+            )
+
+
+        return pb.Booking(
+            booking_id=booking_id,
+            event_id=event_id,
+            participant_id=participant_id,
+            participant_name=participant.name
+        )
+
 
 events = event_pb2_grpc.EventServiceStub(grpc.insecure_channel(CONFIG["event_service"]))
 server = grpc.server(futures.ThreadPoolExecutor(max_workers=8))

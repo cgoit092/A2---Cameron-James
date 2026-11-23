@@ -126,7 +126,27 @@ def list_bookings(event_id):
 
 @app.post("/api/v1/registrations")
 def book():
-    abort(501, "TODO task 4: implement POST /api/v1/registrations")
+    body = json_body()
+
+    event_id = body.get("event_id")
+    participant_id = body.get("participant_id")
+
+    if (
+        type(event_id) is not int
+        or type(participant_id) is not int
+        or not 0 < event_id < 2**63
+        or not 0 < participant_id < 2**63
+    ):
+        abort(400, "event_id and participant_id must be positive integers")
+
+    booking = registrations.CreateBooking(
+        registration_pb2.CreateBookingRequest(
+            event_id=event_id,
+            participant_id=participant_id
+        )
+    )
+
+    return jsonify(fields(booking)), 201
 
 
 @app.delete("/api/v1/registrations/<int:booking_id>")
