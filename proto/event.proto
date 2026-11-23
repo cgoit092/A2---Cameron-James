@@ -6,6 +6,7 @@ service EventService {
   rpc GetEvent(EventId) returns (Event);
   rpc ReleaseSeat(EventId) returns (Empty);
   rpc ListEvents(ListEventsRequest) returns (EventList);
+  rpc CreateEvent(CreateEventRequest) returns (Event);
 }
 
 message EventId { int64 event_id = 1; }
@@ -16,3 +17,5 @@ message Empty {}
 message ListEventsRequest { string name = 1; }
 // One reply holding the whole list (repeated field) rather than a stream.
 message EventList { repeated Event events = 1; }
+
+message CreateEventRequest { string name = 1; int32 capacity = 2; }

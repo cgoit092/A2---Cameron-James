@@ -47,6 +47,15 @@ class EventService(rpc.EventServiceServicer):
                     ("%" + request.name + "%",))
         return pb.EventList(events=[pb.Event(**row) for row in rows])
 
+    def CreateEvent(self, request, context):
+        name = request.name.strip()
+        if not name:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Event name must not be blank")
+        if len(name) > 150:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Event name must be 150 characters or fewer")
+        new_id = write("INSERT INTO events (name, capacity) VALUES (%s, %s)", (name, request.capacity))
+        return self.GetEvent(pb.EventId(event_id=new_id), context)
+
 
 server = grpc.server(futures.ThreadPoolExecutor(max_workers=8))
 rpc.add_EventServiceServicer_to_server(EventService(), server)
