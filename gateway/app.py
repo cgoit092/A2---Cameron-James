@@ -27,6 +27,17 @@ registrations = registration_pb2_grpc.RegistrationServiceStub(
     grpc.insecure_channel(CONFIG["registration_service"]))
 
 
+@app.before_request
+def check_staff_token():
+    protected_routes = {"add_event", "edit_event", "delete_event"}
+
+    if request.endpoint in protected_routes:
+        expected_token = f"Bearer {CONFIG['staff_token']}"
+        provided_token = request.headers.get("Authorization")
+
+        if provided_token != expected_token:
+            abort(401, "Missing or invalid staff token")
+
 def fields(message):
     return {field.name: getattr(message, field.name) for field in message.DESCRIPTOR.fields}
 
