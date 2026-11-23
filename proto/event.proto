@@ -8,6 +8,7 @@ service EventService {
   rpc ListEvents(ListEventsRequest) returns (EventList);
   rpc CreateEvent(CreateEventRequest) returns (Event);
   rpc UpdateEvent(UpdateEventRequest) returns (Event);
+  rpc DeleteEvent(EventId) returns (Empty);
 }
 
 message EventId { int64 event_id = 1; }

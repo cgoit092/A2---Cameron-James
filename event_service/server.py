@@ -78,6 +78,15 @@ class EventService(rpc.EventServiceServicer):
             write(f"UPDATE events SET {', '.join(changes)} WHERE event_id = %s", (*args, request.event_id))
         return self.GetEvent(pb.EventId(event_id=request.event_id), context)
 
+    def DeleteEvent(self, request, context):
+        found = read("SELECT seats_taken FROM events WHERE event_id = %s", (request.event_id,))
+        if not found:
+            context.abort(grpc.StatusCode.NOT_FOUND, "Event not found")
+        if found[0]["seats_taken"] > 0:
+            context.abort(grpc.StatusCode.FAILED_PRECONDITION, "Event has bookings and cannot be deleted")
+        write("DELETE FROM events WHERE event_id = %s", (request.event_id,))
+        return pb.Empty()
+
 server = grpc.server(futures.ThreadPoolExecutor(max_workers=8))
 rpc.add_EventServiceServicer_to_server(EventService(), server)
 server.add_insecure_port(CONFIG["listen"])
