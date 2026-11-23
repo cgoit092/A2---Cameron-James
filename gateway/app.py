@@ -1,7 +1,7 @@
 import json
 
 import grpc
-from flask import Flask, abort, jsonify
+from flask import Flask, abort, jsonify, request
 from werkzeug.exceptions import HTTPException
 import event_pb2
 import event_pb2_grpc
@@ -19,6 +19,8 @@ STATUS = {
     grpc.StatusCode.UNAVAILABLE: 503,
 }
 
+MAX_INT32 = 2**31 - 1  # largest value an int32 protobuf field can hold
+
 app = Flask(__name__)
 events = event_pb2_grpc.EventServiceStub(grpc.insecure_channel(CONFIG["event_service"]))
 registrations = registration_pb2_grpc.RegistrationServiceStub(
@@ -27,6 +29,12 @@ registrations = registration_pb2_grpc.RegistrationServiceStub(
 
 def fields(message):
     return {field.name: getattr(message, field.name) for field in message.DESCRIPTOR.fields}
+
+def json_body():
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        abort(400, "Request body must be a JSON object")
+    return body
 
 
 @app.errorhandler(grpc.RpcError)
@@ -41,7 +49,8 @@ def http_error(error):
 
 @app.get("/api/v1/events")
 def list_events():
-    abort(501, "TODO task 1: implement GET /api/v1/events")
+    reply = events.ListEvents(event_pb2.ListEventsRequest(name=request.args.get("name", "")))
+    return jsonify([fields(event) for event in reply.events])
 
 
 @app.get("/api/v1/events/<int:event_id>")
@@ -51,27 +60,63 @@ def get_event(event_id):
 
 @app.post("/api/v1/events")
 def add_event():
-    abort(501, "TODO task 2: implement POST /api/v1/events")
+    body = json_body()
+    name, capacity = body.get("name"), body.get("capacity")
+    if not isinstance(name, str):
+        abort(400, "name is required and must be a string")
+    if type(capacity) is not int or not 0 <= capacity <= MAX_INT32:
+        abort(400, "capacity is required and must be a whole number from 0 to 2147483647")
+    event = events.CreateEvent(event_pb2.CreateEventRequest(name=name, capacity=capacity))
+    return jsonify(fields(event)), 201
 
 
 @app.patch("/api/v1/events/<int:event_id>")
 def edit_event(event_id):
-    abort(501, "TODO task 2: implement PATCH /api/v1/events/<event_id>")
+    body = json_body()
+    unknown = set(body) - {"name", "capacity"}
+    if unknown:
+         abort(400, f"Unknown field(s): {', '.join(sorted(unknown))}")
+    if not body:
+         abort(400, "Send name and/or capacity")
+    if "name" in body and not isinstance(body["name"], str):
+         abort(400, "name must be a string")
+    if "capacity" in body and (type(body["capacity"]) is not int or not 0 <= body["capacity"] <= MAX_INT32):
+         abort(400, "capacity must be a whole number from 0 to 2147483647")
+    event = events.UpdateEvent(event_pb2.UpdateEventRequest(event_id=event_id, **body))
+    return jsonify(fields(event))
 
 
 @app.delete("/api/v1/events/<int:event_id>")
 def delete_event(event_id):
-    abort(501, "TODO task 2: implement DELETE /api/v1/events/<event_id>")
+    events.DeleteEvent(event_pb2.EventId(event_id=event_id))
+    return "", 204
 
 
 @app.post("/api/v1/participants")
 def add_participant():
-    abort(501, "TODO task 3: implement POST /api/v1/participants")
+    body = request.get_json(silent=True)
+
+    if not isinstance(body, dict):
+        abort(400, "Request body must be a JSON object")
+
+    name = body.get("name")
+    if not isinstance(name, str):
+        abort(400, "name is required and must be a string")
+
+    participant = registrations.CreateParticipant(
+        registration_pb2.CreateParticipantRequest(name=name)
+    )
+
+    return jsonify(fields(participant)), 201
 
 
 @app.get("/api/v1/participants/<int:participant_id>")
 def get_participant(participant_id):
-    abort(501, "TODO task 3: implement GET /api/v1/participants/<participant_id>")
+    participant = registrations.GetParticipant(
+        registration_pb2.ParticipantId(participant_id=participant_id)
+    )
+
+    return jsonify(fields(participant))
 
 
 @app.get("/api/v1/events/<int:event_id>/registrations")

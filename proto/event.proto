@@ -5,8 +5,22 @@ package campus.events.v1;
 service EventService {
   rpc GetEvent(EventId) returns (Event);
   rpc ReleaseSeat(EventId) returns (Empty);
+  rpc ListEvents(ListEventsRequest) returns (EventList);
+  rpc CreateEvent(CreateEventRequest) returns (Event);
+  rpc UpdateEvent(UpdateEventRequest) returns (Event);
+  rpc DeleteEvent(EventId) returns (Empty);
 }
 
 message EventId { int64 event_id = 1; }
 message Event { int64 event_id = 1; string name = 2; int32 capacity = 3; int32 available_seats = 4; }
 message Empty {}
+
+// name is a substring filter; an empty string means "return every event".
+message ListEventsRequest { string name = 1; }
+// One reply holding the whole list (repeated field) rather than a stream.
+message EventList { repeated Event events = 1; }
+
+message CreateEventRequest { string name = 1; int32 capacity = 2; }
+
+// optional lets the service tell "not sent" apart from "sent as empty/zero".
+message UpdateEventRequest { int64 event_id = 1; optional string name = 2; optional int32 capacity = 3; }
