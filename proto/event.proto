@@ -7,6 +7,7 @@ service EventService {
   rpc ReleaseSeat(EventId) returns (Empty);
   rpc ListEvents(ListEventsRequest) returns (EventList);
   rpc CreateEvent(CreateEventRequest) returns (Event);
+  rpc UpdateEvent(UpdateEventRequest) returns (Event);
 }
 
 message EventId { int64 event_id = 1; }
@@ -19,3 +20,6 @@ message ListEventsRequest { string name = 1; }
 message EventList { repeated Event events = 1; }
 
 message CreateEventRequest { string name = 1; int32 capacity = 2; }
+
+// optional lets the service tell "not sent" apart from "sent as empty/zero".
+message UpdateEventRequest { int64 event_id = 1; optional string name = 2; optional int32 capacity = 3; }

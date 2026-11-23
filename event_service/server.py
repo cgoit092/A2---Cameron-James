@@ -47,15 +47,36 @@ class EventService(rpc.EventServiceServicer):
                     ("%" + request.name + "%",))
         return pb.EventList(events=[pb.Event(**row) for row in rows])
 
-    def CreateEvent(self, request, context):
-        name = request.name.strip()
+    def check_name(self, name, context):
+        name = name.strip()
         if not name:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Event name must not be blank")
         if len(name) > 150:
             context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Event name must be 150 characters or fewer")
+        return name
+
+    def CreateEvent(self, request, context):
+        name = self.check_name(request.name, context)
         new_id = write("INSERT INTO events (name, capacity) VALUES (%s, %s)", (name, request.capacity))
         return self.GetEvent(pb.EventId(event_id=new_id), context)
 
+    def UpdateEvent(self, request, context):
+        found = read("SELECT seats_taken FROM events WHERE event_id = %s", (request.event_id,))
+        if not found:
+            context.abort(grpc.StatusCode.NOT_FOUND, "Event not found")
+        changes, args = [], []
+        if request.HasField("name"):
+            changes.append("name = %s")
+            args.append(self.check_name(request.name, context))
+        if request.HasField("capacity"):
+            if request.capacity < found[0]["seats_taken"]:
+                context.abort(grpc.StatusCode.FAILED_PRECONDITION,
+                              "Capacity cannot be lower than the seats already booked")
+            changes.append("capacity = %s")
+            args.append(request.capacity)
+        if changes:
+            write(f"UPDATE events SET {', '.join(changes)} WHERE event_id = %s", (*args, request.event_id))
+        return self.GetEvent(pb.EventId(event_id=request.event_id), context)
 
 server = grpc.server(futures.ThreadPoolExecutor(max_workers=8))
 rpc.add_EventServiceServicer_to_server(EventService(), server)
